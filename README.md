@@ -9,5 +9,5 @@ Todo
 - [ ] Sound
 - [ ] Bouncy ropes
 - [ ] Colors
-  - [ ] Ground gradient (#565482 -> #64C16E ?)
-  - [ ] Balls and shiet
+  - Ground gradient (#565482 -> #64C16E ?)
+  - Balls and shiet
