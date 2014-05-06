@@ -1,8 +1,8 @@
 Todo
 ====
 
-- [X] Workspace radius
-- [X] Starting position
+- [x] Workspace radius
+- [x] Starting position
 - [ ] Two slangs and one bella
 - [ ] Targets + physics
 - [ ] Depth (matrix? poles? holes? guacamoles?)
