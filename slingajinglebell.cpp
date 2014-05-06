@@ -125,6 +125,10 @@ cVector3d poleTopPos(0, 0, 0);
 bool springFired = false;
 double slingSpringConst = 40;
 
+// Floor grid
+const int gridLineNumber = 50;
+float gridLineSpacing = 0.4;
+
 bool keyDown = false;
 
 double springFiredStep;
@@ -309,6 +313,37 @@ int main(int argc, char* argv[]) {
 
 	// position ground at the right level
 	ground->setPos(0.0, 0.0, -1.0);
+
+
+	//////////////////////////////////////////////////////////////////////////
+	// Create a floor grid matrix (good ol' fashioned)
+	//////////////////////////////////////////////////////////////////////////
+
+	float cAlpha = 0.5;
+	for (int i = 0; i < gridLineNumber; i++) {
+		float y = i * gridLineSpacing - gridLineSpacing * gridLineNumber / 2.0;
+		float z = -0.99;
+		float x = gridLineSpacing * gridLineNumber / 2.0;
+
+		cShapeLine* line1 = new cShapeLine(cVector3d(-x, y, z), cVector3d(x, y,
+				z));
+
+		line1->m_ColorPointA.set(133, 0, 137, cAlpha);
+		line1->m_ColorPointB.set(0, 165, 165, cAlpha);
+		world->addChild(line1);
+
+		for (int j = 0; j < gridLineNumber; j++) {
+			float y = j * gridLineSpacing - gridLineSpacing * gridLineNumber
+					/ 2.0;
+
+			cShapeLine* line2 = new cShapeLine(cVector3d(y, -x, z), cVector3d(
+					y, x, z));
+			line2->m_ColorPointA.set(133, 0, 137, cAlpha);
+			line2->m_ColorPointB.set(0, 165, 165, cAlpha);
+
+			world->addChild(line2);
+		}
+	}
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
