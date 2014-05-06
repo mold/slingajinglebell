@@ -14,7 +14,9 @@
 
  \author    <http://www.chai3d.org>
  \author    Francois Conti
- \version   2.1.0 $Rev: 322 $
+ \authro	Daniel Molin
+ \author	John Brynte Turesson
+ \version   (2.1.0 $Rev: 322 $) 0.1
  */
 //===========================================================================
 
@@ -129,6 +131,9 @@ double springFiredStep;
 
 bool vibrate = true;
 
+double deviceCenterForce = 20;
+cVector3d deviceCenter;
+
 //---------------------------------------------------------------------------
 // DECLARED FUNCTIONS
 //---------------------------------------------------------------------------
@@ -238,6 +243,9 @@ int main(int argc, char* argv[]) {
 	// define a scale factor between the force perceived at the cursor and the
 	// forces actually sent to the haptic device
 	deviceForceScale = 0.1 * info.m_maxForce;
+
+	// set the center point of the haptic device in the virtual environment
+	deviceCenter = cVector3d(-cursorWorkspaceRadius*0.9, 0, 0);
 
 	// create a large sphere that represents the haptic device
 	deviceRadius = 0.05;
@@ -496,13 +504,15 @@ void updateHaptics(void) {
 
 		cVector3d realPos;
 		cVector3d pos;
+		cVector3d virtualPos;
 		hapticDevice->getPosition(realPos);
 		realPos.mul(workspaceScaleFactor);
 		pos.copyfrom(realPos);
 		if (limitX) {
 			pos.x = 0;
 		}
-		device->setPos(realPos);
+		virtualPos = cAdd(poleTopPos, cSub(pos, deviceCenter));
+		device->setPos(virtualPos);
 
 		// init temp variable
 		cVector3d force;
@@ -513,18 +523,14 @@ void updateHaptics(void) {
 		if (key) {
 			keyDown = true;
 			springFired = false;
-			projectile->setPos(pos);
+			// Set the projectile virutal position
+			projectile->setPos(virtualPos);
 			projectileVel = cVector3d(0, 0, 0);
-
-			camera->set(cVector3d(2.8, 0.0, 0.0), // camera position (eye)
-					poleTopPos, // look-at position (target)
-					cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
-
 
 			/* Activate spring */
 			//if (pos.z < poleTopPos.z) {
 				// Get vector from projectile to slingtop
-				cVector3d spring = poleTopPos - pos;
+				cVector3d spring = deviceCenter - pos;
 				double distance = spring.length();
 
 				spring = cNormalize(spring);
@@ -559,10 +565,9 @@ void updateHaptics(void) {
 			cVector3d gravityStep = cMul(timeInterval, GRAVITY);
 			projectileVel.add(gravityStep);
 
-			camera->set(cVector3d(2.8, 0.0, 0.0), // camera position (eye)
-					projectile->getPos(), // look-at position (target)
-					cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
-
+			// Pull the device to its initial position
+			cVector3d pullDirection = cSub(deviceCenter, pos);
+			force.add(cMul(deviceCenterForce, pullDirection));
 		}
 
 		if (springFired) {
@@ -592,7 +597,7 @@ void updateHaptics(void) {
 		force.mul(deviceForceScale);
 		if (limitX) {
 			// restrict movement in x-axis
-			force.x = -realPos.x * 200;
+			//force.x = -realPos.x * 200;
 		}
 
 		// send forces to haptic device

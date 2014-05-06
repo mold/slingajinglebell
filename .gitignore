@@ -19,3 +19,12 @@
 *.exe
 *.out
 *.app
+
+# Eclipse
+.cproject
+.project
+CMakeCache.txt
+CMakeFiles/*
+Makefile
+*.cmake
+slingajinglebell
