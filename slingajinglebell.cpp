@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
 //---------------------------------------------------------------------------
 #include "chai3d.h"
 
@@ -126,8 +127,10 @@ bool springFired = false;
 double slingSpringConst = 40;
 
 // Floor grid
-const int gridLineNumber = 50;
-float gridLineSpacing = 0.4;
+const int gridLineNumber = 80;
+float gridLineSpacing = 0.6;
+
+float groundZ = -1.0;
 
 bool keyDown = false;
 
@@ -249,7 +252,7 @@ int main(int argc, char* argv[]) {
 	deviceForceScale = 0.1 * info.m_maxForce;
 
 	// set the center point of the haptic device in the virtual environment
-	deviceCenter = cVector3d(-cursorWorkspaceRadius*0.9, 0, 0);
+	deviceCenter = cVector3d(-cursorWorkspaceRadius * 0.9, 0, 0);
 
 	// create a large sphere that represents the haptic device
 	deviceRadius = 0.05;
@@ -312,8 +315,7 @@ int main(int argc, char* argv[]) {
 	ground->computeAllNormals();
 
 	// position ground at the right level
-	ground->setPos(0.0, 0.0, -1.0);
-
+	ground->setPos(0.0, 0.0, groundZ);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create a floor grid matrix (good ol' fashioned)
@@ -322,7 +324,7 @@ int main(int argc, char* argv[]) {
 	float cAlpha = 0.5;
 	for (int i = 0; i < gridLineNumber; i++) {
 		float y = i * gridLineSpacing - gridLineSpacing * gridLineNumber / 2.0;
-		float z = -0.99;
+		float z = groundZ + 0.00001;
 		float x = gridLineSpacing * gridLineNumber / 2.0;
 
 		cShapeLine* line1 = new cShapeLine(cVector3d(-x, y, z), cVector3d(x, y,
@@ -564,25 +566,30 @@ void updateHaptics(void) {
 
 			/* Activate spring */
 			//if (pos.z < poleTopPos.z) {
-				// Get vector from projectile to slingtop
-				cVector3d spring = deviceCenter - pos;
-				double distance = spring.length();
+			// Get vector from projectile to slingtop
+			cVector3d spring = deviceCenter - pos;
+			double distance = spring.length();
 
-				spring = cNormalize(spring);
+			spring = cNormalize(spring);
 
-				// Add spring force to allaround force
-				force.add(
-						cAdd(cMul(slingSpringConst * distance, spring), force));
+			// Add spring force to allaround force
+			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
 
-				// Add vibration
-				if (vibrate)
-					force.add(getVibrationForceVector(distance * distance
-							* distance * slingSpringConst));
+			// Add vibration
+			if (vibrate)
+				force.add(getVibrationForceVector(distance * distance
+						* distance * slingSpringConst));
 			//}
 
 			// add gravity to haptic device
 			cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
 			force.add(projectileGravity);
+
+			// Keep the projectile at/above ground level
+			cVector3d projectilePos = projectile->getPos();
+			if (projectilePos.z < groundZ) {
+				projectile->setPos(projectilePos.x, projectilePos.y, groundZ);
+			}
 		} else if (keyDown) {
 			// The key has been released
 			keyDown = false;
@@ -603,6 +610,14 @@ void updateHaptics(void) {
 			// Pull the device to its initial position
 			cVector3d pullDirection = cSub(deviceCenter, pos);
 			force.add(cMul(deviceCenterForce, pullDirection));
+
+			// make projectile stick to ground
+			cVector3d projPos = projectile->getPos();
+			if (projPos.z + projectileVel.z < groundZ) {
+				cVector3d dir = cNormalize(projectileVel);
+				double zDistToGround = (groundZ - projPos.z) / dir.z;
+				projectileVel = cMul(zDistToGround, projectileVel);
+			}
 		}
 
 		if (springFired) {
@@ -627,6 +642,13 @@ void updateHaptics(void) {
 
 		// update position of projectile
 		projectile->setPos(cAdd(projectile->getPos(), projectileVel));
+
+		/** PRINT INFO **/
+		/*string posStr;
+		 string velStr;
+		 projectile->getPos().str(posStr);
+		 projectileVel.str(velStr);
+		 std::cout << "pos: " << posStr << " | vel: " << projectileVel.z << std::endl;*/
 
 		// scale force
 		force.mul(deviceForceScale);
