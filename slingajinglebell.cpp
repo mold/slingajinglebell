@@ -108,6 +108,7 @@ cLabel* debugLabels[2];
 // World constants
 //---------------------------------------------------------------------------
 cVector3d const GRAVITY = cVector3d(0, 0, -0.00982);
+cVector3d const center = cVector3d(0, 0, 0);
 
 //---------------------------------------------------------------------------
 // Slingshot
@@ -126,7 +127,9 @@ double projectileMass = 10;
 
 // Slingshot
 cShapeLine* slingSpringLine;
-cVector3d poleTopPos(0, 0, 0);
+cVector3d poleTopPos(0, -0.25, 0);
+cShapeLine* slingSpringLine2;
+cVector3d poleTopPos2(0, 0.25, 0);
 bool springFired = false;
 double slingSpringConst = 40;
 
@@ -209,7 +212,7 @@ int main(int argc, char* argv[]) {
 	world->addChild(camera);
 
 	// position and orient the camera
-	camera->set(cVector3d(2.8, 0.0, 0.0), // camera position (eye)
+	camera->set(cVector3d(3.8, 0.0, 0.0), // camera position (eye)
 			cVector3d(0.0, 0.0, 0.0), // look-at position (target)
 			cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
 
@@ -280,17 +283,28 @@ int main(int argc, char* argv[]) {
 	cShapeLine* pole = new cShapeLine(poleEnd, poleTopPos);
 	world->addChild(pole);
 	// A sling spring line
-	slingSpringLine = new cShapeLine(cVector3d(), cVector3d());
+	slingSpringLine = new cShapeLine(poleTopPos, cVector3d());
 	world->addChild(slingSpringLine);
+
+	// A top of a different pole
+	cShapeSphere* poleTop2 = new cShapeSphere(0.03);
+	poleTop2->setPos(poleTopPos2);
+	world->addChild(poleTop2);
+	// A pole under a top
+	cVector3d poleEnd2 = poleTopPos2 - cVector3d(0, 0, 1);
+	cShapeLine* pole2 = new cShapeLine(poleEnd2, poleTopPos2);
+	world->addChild(pole2);
+	// A sling spring line
+	slingSpringLine2 = new cShapeLine(poleTopPos2, cVector3d());
+	world->addChild(slingSpringLine2);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create and add the projectile
 	//////////////////////////////////////////////////////////////////////////
 	projectile = new cShapeSphere(projectileRadius);
 	world->addChild(projectile);
-	projectile->m_material.m_ambient.set(0.4, 0, 0, 0.7);
-	projectile->m_material.m_ambient.set(0.4, 0, 0, 0.7);
-	projectile->m_material.m_diffuse.set(0.7, 0, 0, 0.7);
+	projectile->m_material.m_ambient.set(0.4, 0.7, 0, 0.7);
+	projectile->m_material.m_diffuse.set(0.5, 0.65, 0, 0.7);
 	projectile->m_material.m_specular.set(1.0, 1.0, 1.0, 0.7);
 	projectile->m_material.setShininess(50);
 
@@ -521,10 +535,13 @@ void close(void) {
 void updateGraphics(void) {
 	bool key;
 	hapticDevice->getUserSwitch(0, key);
-	if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z)
+	if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z) {
 		slingSpringLine->m_pointB = projectile->getPos();
-	else
+		slingSpringLine2->m_pointB = projectile->getPos();
+	} else {
 		slingSpringLine->m_pointB = poleTopPos;
+		slingSpringLine2->m_pointB = poleTopPos2;
+	}
 
 	if (homerun) {
 		titleLabel->setPos(projectile->getPos());
@@ -581,7 +598,8 @@ void updateHaptics(void) {
 		if (limitX) {
 			pos.x = 0;
 		}
-		virtualPos = cAdd(poleTopPos, cSub(pos, deviceCenter));
+
+		virtualPos = cAdd(center, cSub(pos, deviceCenter));
 		device->setPos(virtualPos);
 
 		// init temp variable
@@ -600,7 +618,6 @@ void updateHaptics(void) {
 			projectileVel = cVector3d(0, 0, 0);
 
 			/* Activate spring */
-			//if (pos.z < poleTopPos.z) {
 			// Get vector from projectile to slingtop
 			cVector3d spring = deviceCenter - pos;
 			double distance = spring.length();
@@ -609,6 +626,15 @@ void updateHaptics(void) {
 
 			// Add spring force to allaround force
 			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
+
+			//			// Get another vector from projectile to another slingtop
+			//			spring = deviceCenter - pos;
+			//			distance = spring.length();
+			//
+			//			spring = cNormalize(spring);
+			//
+			//			// Add spring force to allaround force
+			//			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
 
 			// Add vibration
 			if (vibrate) {
@@ -667,6 +693,14 @@ void updateHaptics(void) {
 				double distance = acc.length();
 				cVector3d springForce = cDiv(projectileMass, acc);
 				// apply the force to the sling force
+				springForce.mul(timeInterval);
+				projectileVel.add(springForce);
+
+				// Get another vector from projectile to another slingtop
+				acc = poleTopPos2 - projectile->getPos();
+				distance = acc.length();
+				springForce = cDiv(projectileMass, acc);
+				// apply the second force to the sling force
 				springForce.mul(timeInterval);
 				projectileVel.add(springForce);
 			} else {
