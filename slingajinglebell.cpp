@@ -30,6 +30,8 @@
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "chai3d.h"
+//---------------------------------------------------------------------------
+#include "CircleMesh.h"
 
 //---------------------------------------------------------------------------
 // DECLARED CONSTANTS
@@ -172,6 +174,89 @@ cVector3d computeForce(const cVector3d& a_cursor, double a_cursorRadius,
 
 cVector3d getVibrationForceVector(double intensity);
 
+//////////////////////////////////////////
+// Circle class
+//////////////////////////////////////////
+class CircleMesh {
+private:
+	cMesh* circle;
+public:
+	double radius, x, y, z;
+	CircleMesh(cWorld*, double);
+	void setColor(double, double, double);
+	void setPos(cVector3d);
+	virtual ~CircleMesh();
+};
+
+CircleMesh::CircleMesh(cWorld *world, double radius) {
+	// create circle mesh
+	circle = new cMesh(world);
+	world->addChild(circle);
+
+	int res = 40;
+	double step = 2 * M_PI / res;
+	int v0, v1, v2;
+	for (int i = 0; i < res; i++) {
+		v2 = circle->newVertex(0, radius * sin(i * step), radius * cos(i * step));
+		if (i == 0) {
+			v0 = v2;
+		} else if (i == 1) {
+			v1 = v2;
+		} else {
+			circle->newTriangle(v0, v2, v1);
+			v1 = v2;
+		}
+	}
+
+	// compute surface normals
+	circle->computeAllNormals();
+}
+
+void CircleMesh::setColor(double r, double g, double b) {
+	// define some material properties and apply to mesh
+	cMaterial mat;
+	mat.m_ambient.set(r, g, b);
+	mat.m_diffuse.set(r, g, b);
+	mat.m_specular.set(r, g, b);
+	circle->setMaterial(mat);
+}
+
+void CircleMesh::setPos(cVector3d pos) {
+	circle->setPos(pos);
+}
+
+CircleMesh::~CircleMesh() {
+
+}
+
+//////////////////////////////////////////
+// Target class
+//////////////////////////////////////////
+class Target {
+private:
+	CircleMesh* t1;
+	CircleMesh* t2;
+	CircleMesh* t3;
+public:
+	double radius;
+	Target(cWorld*, double);
+	virtual ~Target();
+};
+
+Target::Target(cWorld *world, double radius) {
+	t1 = new CircleMesh(world, radius);
+	t1->setColor(0.2, 0.2, 0.2);
+	t2 = new CircleMesh(world, radius*0.6);
+	t2->setPos(cVector3d(0.01, 0, 0));
+	t3 = new CircleMesh(world, radius*0.3);
+	t3->setColor(0.2, 0.2, 0.2);
+	t3->setPos(cVector3d(0.02, 0, 0));
+}
+
+Target::~Target() {
+
+}
+
 //===========================================================================
 /*
  DEMO:    GEM_membrane.cpp
@@ -208,7 +293,7 @@ int main(int argc, char* argv[]) {
 	world->addChild(camera);
 
 	// position and orient the camera
-	camera->set(cVector3d(2.8, 0.0, 0.0), // camera position (eye)
+	camera->set(cVector3d(3.8, 0.0, 0.0), // camera position (eye)
 			cVector3d(0.0, 0.0, 0.0), // look-at position (target)
 			cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
 
@@ -299,7 +384,7 @@ int main(int argc, char* argv[]) {
 
 	// create mesh to model ground surface
 	cMesh* ground = new cMesh(world);
-	world->addChild(ground);
+	//world->addChild(ground);
 
 	// create 4 vertices (one at each corner)
 	double groundSizeX = 1.0;
@@ -360,6 +445,13 @@ int main(int argc, char* argv[]) {
 			world->addChild(line2);
 		}
 	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// Create some targets
+	//////////////////////////////////////////////////////////////////////////
+	//CircleMesh *circle = new CircleMesh(world, 1);
+	//circle->setColor(1,0,0);
+	Target *target = new Target(world, 1);
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
