@@ -122,6 +122,7 @@ double deviceRadius;
 // Projectile
 cVector3d projectileVel;
 cShapeSphere* projectile;
+cMesh* projectileShadow;
 double projectileRadius = 0.1;
 double projectileMass = 10;
 
@@ -377,6 +378,24 @@ int main(int argc, char* argv[]) {
 	projectile->m_material.m_diffuse.set(0.7, 0, 0, 0.7);
 	projectile->m_material.m_specular.set(1.0, 1.0, 1.0, 0.7);
 	projectile->m_material.setShininess(50);
+
+	// Shadow!
+	projectileShadow = new cMesh(world);
+	world->addChild(projectileShadow);
+	float shadowRadius = projectileRadius * 0.7;
+	int sv0 = projectileShadow->newVertex(-shadowRadius, -shadowRadius, 0.0);
+	int sv1 = projectileShadow->newVertex(shadowRadius, -shadowRadius, 0.0);
+	int sv2 = projectileShadow->newVertex(shadowRadius, shadowRadius, 0.0);
+	int sv3 = projectileShadow->newVertex(-shadowRadius, shadowRadius, 0.0);
+	cColorf* shC = new cColorf(20, 200, 0, 0.3);
+	projectileShadow->setVertexColor(*shC, true);
+	projectileShadow->setUseVertexColors(true, true);
+
+	projectileShadow->newTriangle(sv0, sv1, sv2);
+	projectileShadow->newTriangle(sv0, sv2, sv3);
+	projectileShadow->computeAllNormals();
+	projectileShadow->setPos(0.0, 0.0, groundZ + 0.0001);
+	std::cout << projectileShadow->getColorsEnabled() << std::endl;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create a Ground
@@ -748,8 +767,10 @@ void updateHaptics(void) {
 
 		}
 
-		// update position of projectile
+		// update position of projectile and shadow
 		projectile->setPos(cAdd(projectile->getPos(), projectileVel));
+		projectileShadow->setPos(projectile->getPos().x,
+				projectile->getPos().y, groundZ + 0.0001);
 
 		/** PRINT INFO **/
 		/*string posStr;
