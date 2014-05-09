@@ -3,7 +3,7 @@ Todo
 
 - [x] Workspace radius
 - [x] Starting position
-- [ ] Fix buggy areas
+- [x] Fix buggy areas
   - Top right corner, what is up????
 - [ ] Two slangs and one bella
 - [ ] Targets + physics
