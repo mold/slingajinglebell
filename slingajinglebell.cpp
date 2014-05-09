@@ -30,8 +30,6 @@
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "chai3d.h"
-//---------------------------------------------------------------------------
-#include "CircleMesh.h"
 
 //---------------------------------------------------------------------------
 // DECLARED CONSTANTS
@@ -180,16 +178,21 @@ cVector3d getVibrationForceVector(double intensity);
 //////////////////////////////////////////
 class CircleMesh {
 private:
+	cVector3d pos;
+	double radius;
 	cMesh* circle;
 public:
-	double radius, x, y, z;
-	CircleMesh(cWorld*, double);
+	CircleMesh(cWorld*, cVector3d, double);
 	void setColor(double, double, double);
 	void setPos(cVector3d);
+	void rotate(cVector3d, double);
 	virtual ~CircleMesh();
 };
 
-CircleMesh::CircleMesh(cWorld *world, double radius) {
+CircleMesh::CircleMesh(cWorld *world, cVector3d pos, double radius) {
+	this->pos = pos;
+	this->radius = radius;
+
 	// create circle mesh
 	circle = new cMesh(world);
 	world->addChild(circle);
@@ -198,7 +201,8 @@ CircleMesh::CircleMesh(cWorld *world, double radius) {
 	double step = 2 * M_PI / res;
 	int v0, v1, v2;
 	for (int i = 0; i < res; i++) {
-		v2 = circle->newVertex(0, radius * sin(i * step), radius * cos(i * step));
+		v2 = circle->newVertex(0, radius * sin(i * step), radius
+				* cos(i * step));
 		if (i == 0) {
 			v0 = v2;
 		} else if (i == 1) {
@@ -209,8 +213,8 @@ CircleMesh::CircleMesh(cWorld *world, double radius) {
 		}
 	}
 
-	// compute surface normals
 	circle->computeAllNormals();
+	circle->setPos(pos);
 }
 
 void CircleMesh::setColor(double r, double g, double b) {
@@ -226,6 +230,10 @@ void CircleMesh::setPos(cVector3d pos) {
 	circle->setPos(pos);
 }
 
+void CircleMesh::rotate(cVector3d axis, double angle) {
+	circle->rotate(axis, angle);
+}
+
 CircleMesh::~CircleMesh() {
 
 }
@@ -235,23 +243,29 @@ CircleMesh::~CircleMesh() {
 //////////////////////////////////////////
 class Target {
 private:
-	CircleMesh* t1;
-	CircleMesh* t2;
-	CircleMesh* t3;
-public:
+	cVector3d pos;
 	double radius;
-	Target(cWorld*, double);
+	CircleMesh* target;
+public:
+	Target(cWorld*, cVector3d, double);
+	bool sphereCollide(cShapeSphere);
 	virtual ~Target();
 };
 
-Target::Target(cWorld *world, double radius) {
-	t1 = new CircleMesh(world, radius);
-	t1->setColor(0.2, 0.2, 0.2);
-	t2 = new CircleMesh(world, radius*0.6);
-	t2->setPos(cVector3d(0.01, 0, 0));
-	t3 = new CircleMesh(world, radius*0.3);
-	t3->setColor(0.2, 0.2, 0.2);
-	t3->setPos(cVector3d(0.02, 0, 0));
+Target::Target(cWorld *world, cVector3d pos, double radius) {
+	this->pos = pos;
+	this->radius = radius;
+	target = new CircleMesh(world, pos, radius);
+	target->setColor(0, 1, 0);
+	// create a line that runs to the floor
+	cVector3d floor;
+	floor.copyfrom(pos);
+	floor.z = 0;
+	cShapeLine *line = new cShapeLine(floor, pos);
+}
+
+bool Target::sphereCollide(cShapeSphere sphere) {
+	return false;
 }
 
 Target::~Target() {
@@ -470,7 +484,7 @@ int main(int argc, char* argv[]) {
 	//////////////////////////////////////////////////////////////////////////
 	//CircleMesh *circle = new CircleMesh(world, 1);
 	//circle->setColor(1,0,0);
-	Target *target = new Target(world, 1);
+	Target *target = new Target(world, cVector3d(0, 0, 0), 0.2);
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
