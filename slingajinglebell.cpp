@@ -25,8 +25,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <iostream>
+#include <sstream>
 //---------------------------------------------------------------------------
 #include "chai3d.h"
 
@@ -94,6 +95,8 @@ bool limitX = false;
 // show homerun
 bool homerun = false;
 cLabel* titleLabel;
+
+cLabel* debugLabels[2];
 
 //---------------------------------------------------------------------------
 // DECLARED MACROS
@@ -316,6 +319,17 @@ int main(int argc, char* argv[]) {
 
 	// position ground at the right level
 	ground->setPos(0.0, 0.0, groundZ);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Debugging
+	//////////////////////////////////////////////////////////////////////////
+
+	for (int i = 0; i < 2; i++) {
+		debugLabels[i] = new cLabel();
+		// The position is fucking arbitrary, dependent on the camera
+		debugLabels[i]->setPos(0, -0.6, 0.8 - 0.06 * i);
+		world->addChild(debugLabels[i]);
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create a floor grid matrix (good ol' fashioned)
@@ -555,6 +569,8 @@ void updateHaptics(void) {
 		cVector3d force;
 		force.zero();
 
+		double vibrationIntensity = 0.0;
+
 		bool key;
 		hapticDevice->getUserSwitch(0, key);
 		if (key) {
@@ -576,10 +592,10 @@ void updateHaptics(void) {
 			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
 
 			// Add vibration
-			if (vibrate)
-				force.add(getVibrationForceVector(distance * distance
-						* distance * slingSpringConst));
-			//}
+			if (vibrate) {
+				vibrationIntensity = (1 - cos(M_PI * distance / 2)) / 2;
+				force.add(getVibrationForceVector(vibrationIntensity));
+			}
 
 			// add gravity to haptic device
 			cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
@@ -659,6 +675,13 @@ void updateHaptics(void) {
 
 		// send forces to haptic device
 		hapticDevice->setForce(force);
+
+		std::ostringstream s;
+		s << "Haptic force: " << force.str();
+		debugLabels[0]->m_string = s.str();
+		s.str("");
+		s << "Vibration intensity: " << vibrationIntensity;
+		debugLabels[1]->m_string = s.str();
 	}
 
 	// exit haptics thread
@@ -695,7 +718,13 @@ cVector3d computeForce(const cVector3d& a_cursor, double a_cursorRadius,
 }
 
 cVector3d getVibrationForceVector(double intensity) {
-	return cVector3d(((double) random() / RAND_MAX) * intensity,
-			((double) random() / RAND_MAX) * intensity, ((double) random()
-					/ RAND_MAX) * intensity);
+	if (intensity > 1)
+		intensity = 1;
+	else if (intensity < 0)
+		intensity = 0;
+
+	return cVector3d(((double) random() / RAND_MAX) * intensity
+			* slingSpringConst, ((double) random() / RAND_MAX) * intensity
+			* slingSpringConst, ((double) random() / RAND_MAX) * intensity
+			* slingSpringConst);
 }
