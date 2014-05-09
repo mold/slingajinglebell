@@ -108,6 +108,7 @@ cLabel* debugLabels[2];
 // World constants
 //---------------------------------------------------------------------------
 cVector3d const GRAVITY = cVector3d(0, 0, -0.00982);
+cVector3d const center = cVector3d(0, 0, 0);
 
 //---------------------------------------------------------------------------
 // Slingshot
@@ -126,9 +127,11 @@ double projectileMass = 10;
 
 // Slingshot
 cShapeLine* slingSpringLine;
-cVector3d poleTopPos(0, 0, 0);
+cVector3d poleTopPos(0, -0.25, 0);
+cShapeLine* slingSpringLine2;
+cVector3d poleTopPos2(0, 0.25, 0);
 bool springFired = false;
-double slingSpringConst = 40;
+double slingSpringConst = 20;
 
 // Floor grid
 const int gridLineNumber = 80;
@@ -248,7 +251,8 @@ private:
 	CircleMesh* target;
 public:
 	Target(cWorld*, cVector3d, double);
-	bool sphereCollide(cShapeSphere);
+	bool sphereCollide(cShapeSphere*);
+	void setColor(double, double, double);
 	virtual ~Target();
 };
 
@@ -260,17 +264,26 @@ Target::Target(cWorld *world, cVector3d pos, double radius) {
 	// create a line that runs to the floor
 	cVector3d floor;
 	floor.copyfrom(pos);
-	floor.z = 0;
-	cShapeLine *line = new cShapeLine(floor, pos);
+	floor.z = groundZ;
+	cShapeLine* line = new cShapeLine(floor, pos);
+	world->addChild(line);
 }
 
-bool Target::sphereCollide(cShapeSphere sphere) {
-	return false;
+bool Target::sphereCollide(cShapeSphere *sphere) {
+	double distance = (cSub(sphere->getPos(), pos)).length();
+	return distance < radius + sphere->getRadius();
+}
+
+void Target::setColor(double r, double g, double b) {
+	target->setColor(r, g, b);
 }
 
 Target::~Target() {
 
 }
+
+// Targets
+Target *targets[3];
 
 //===========================================================================
 /*
@@ -379,17 +392,28 @@ int main(int argc, char* argv[]) {
 	cShapeLine* pole = new cShapeLine(poleEnd, poleTopPos);
 	world->addChild(pole);
 	// A sling spring line
-	slingSpringLine = new cShapeLine(cVector3d(), cVector3d());
+	slingSpringLine = new cShapeLine(poleTopPos, cVector3d());
 	world->addChild(slingSpringLine);
+
+	// A top of a different pole
+	cShapeSphere* poleTop2 = new cShapeSphere(0.03);
+	poleTop2->setPos(poleTopPos2);
+	world->addChild(poleTop2);
+	// A pole under a top
+	cVector3d poleEnd2 = poleTopPos2 - cVector3d(0, 0, 1);
+	cShapeLine* pole2 = new cShapeLine(poleEnd2, poleTopPos2);
+	world->addChild(pole2);
+	// A sling spring line
+	slingSpringLine2 = new cShapeLine(poleTopPos2, cVector3d());
+	world->addChild(slingSpringLine2);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create and add the projectile
 	//////////////////////////////////////////////////////////////////////////
 	projectile = new cShapeSphere(projectileRadius);
 	world->addChild(projectile);
-	projectile->m_material.m_ambient.set(0.4, 0, 0, 0.7);
-	projectile->m_material.m_ambient.set(0.4, 0, 0, 0.7);
-	projectile->m_material.m_diffuse.set(0.7, 0, 0, 0.7);
+	projectile->m_material.m_ambient.set(0.4, 0.7, 0, 0.7);
+	projectile->m_material.m_diffuse.set(0.5, 0.65, 0, 0.7);
 	projectile->m_material.m_specular.set(1.0, 1.0, 1.0, 0.7);
 	projectile->m_material.setShininess(50);
 
@@ -482,9 +506,9 @@ int main(int argc, char* argv[]) {
 	//////////////////////////////////////////////////////////////////////////
 	// Create some targets
 	//////////////////////////////////////////////////////////////////////////
-	//CircleMesh *circle = new CircleMesh(world, 1);
-	//circle->setColor(1,0,0);
-	Target *target = new Target(world, cVector3d(0, 0, 0), 0.2);
+	for (int i = 0; i < 3; i++)
+		targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
+				/ RAND_MAX) * 3), 0.5-((double) random() / RAND_MAX)*1, 0.5-((double) random() / RAND_MAX)*1), 0.2);
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
@@ -627,10 +651,13 @@ void close(void) {
 void updateGraphics(void) {
 	bool key;
 	hapticDevice->getUserSwitch(0, key);
-	if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z)
+	if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z) {
 		slingSpringLine->m_pointB = projectile->getPos();
-	else
+		slingSpringLine2->m_pointB = projectile->getPos();
+	} else {
 		slingSpringLine->m_pointB = poleTopPos;
+		slingSpringLine2->m_pointB = poleTopPos2;
+	}
 
 	if (homerun) {
 		titleLabel->setPos(projectile->getPos());
@@ -687,7 +714,8 @@ void updateHaptics(void) {
 		if (limitX) {
 			pos.x = 0;
 		}
-		virtualPos = cAdd(poleTopPos, cSub(pos, deviceCenter));
+
+		virtualPos = cAdd(center, cSub(pos, deviceCenter));
 		device->setPos(virtualPos);
 
 		// init temp variable
@@ -706,7 +734,6 @@ void updateHaptics(void) {
 			projectileVel = cVector3d(0, 0, 0);
 
 			/* Activate spring */
-			//if (pos.z < poleTopPos.z) {
 			// Get vector from projectile to slingtop
 			cVector3d spring = deviceCenter - pos;
 			double distance = spring.length();
@@ -715,6 +742,15 @@ void updateHaptics(void) {
 
 			// Add spring force to allaround force
 			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
+
+			//			// Get another vector from projectile to another slingtop
+			//			spring = deviceCenter - pos;
+			//			distance = spring.length();
+			//
+			//			spring = cNormalize(spring);
+			//
+			//			// Add spring force to allaround force
+			//			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
 
 			// Add vibration
 			if (vibrate) {
@@ -775,6 +811,14 @@ void updateHaptics(void) {
 				// apply the force to the sling force
 				springForce.mul(timeInterval);
 				projectileVel.add(springForce);
+
+				// Get another vector from projectile to another slingtop
+				acc = poleTopPos2 - projectile->getPos();
+				distance = acc.length();
+				springForce = cDiv(projectileMass, acc);
+				// apply the second force to the sling force
+				springForce.mul(timeInterval);
+				projectileVel.add(springForce);
 			} else {
 				springFired = false;
 			}
@@ -802,6 +846,16 @@ void updateHaptics(void) {
 
 		// send forces to haptic device
 		hapticDevice->setForce(force);
+
+		// Check collision with targets
+		for (int i = 0; i < 3; i++) {
+			if (targets[i]->sphereCollide(projectile)) {
+				projectileVel = cVector3d();
+				targets[i]->setColor(1, 0, 0);
+			} else {
+				targets[i]->setColor(0, 1, 0);
+			}
+		}
 
 		std::ostringstream s;
 		s << "Haptic force: " << force.str();
