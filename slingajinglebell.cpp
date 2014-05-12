@@ -41,7 +41,6 @@ const int WINDOW_SIZE_H = 600;
 
 // mouse menu options (right button)
 const int OPTION_FULLSCREEN = 1;
-const int OPTION_WINDOWDISPLAY = 2;
 const int OPTION_SHOWSKELETON = 3;
 const int OPTION_HIDESKELETON = 4;
 
@@ -59,6 +58,7 @@ cCamera* camera;
 cLight *light;
 
 // width and height of the current window display
+const int OPTION_WINDOWDISPLAY = 2;
 int displayW = 0;
 int displayH = 0;
 
@@ -130,8 +130,13 @@ cShapeLine* slingSpringLine;
 cVector3d poleTopPos(0, -0.25, 0);
 cShapeLine* slingSpringLine2;
 cVector3d poleTopPos2(0, 0.25, 0);
+cShapeSphere* slingCenter;
+cVector3d slingCenterVel(0, 0, 0);
 bool springFired = false;
-double slingSpringConst = 20;
+double prevStretch = 0;
+double slingSpringConst = 30;
+double slingVibrationConst = 10;
+double vibrationStep = 0.001;
 
 // Floor grid
 const int gridLineNumber = 80;
@@ -145,7 +150,7 @@ double springFiredStep;
 
 bool vibrate = true;
 
-double deviceCenterForce = 20;
+double deviceCenterForce = 10;
 cVector3d deviceCenter;
 
 //---------------------------------------------------------------------------
@@ -407,6 +412,9 @@ int main(int argc, char* argv[]) {
 	slingSpringLine2 = new cShapeLine(poleTopPos2, cVector3d());
 	world->addChild(slingSpringLine2);
 
+	slingCenter = new cShapeSphere(0.03);
+	world->addChild(slingCenter);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Create and add the projectile
 	//////////////////////////////////////////////////////////////////////////
@@ -508,7 +516,8 @@ int main(int argc, char* argv[]) {
 	//////////////////////////////////////////////////////////////////////////
 	for (int i = 0; i < 3; i++)
 		targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
-				/ RAND_MAX) * 3), 0.5-((double) random() / RAND_MAX)*1, 0.5-((double) random() / RAND_MAX)*1), 0.2);
+				/ RAND_MAX) * 3), 0.5 - ((double) random() / RAND_MAX) * 1, 0.5
+				- ((double) random() / RAND_MAX) * 1), 0.2);
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
@@ -649,15 +658,17 @@ void close(void) {
 //---------------------------------------------------------------------------
 
 void updateGraphics(void) {
-	bool key;
-	hapticDevice->getUserSwitch(0, key);
-	if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z) {
-		slingSpringLine->m_pointB = projectile->getPos();
-		slingSpringLine2->m_pointB = projectile->getPos();
-	} else {
-		slingSpringLine->m_pointB = poleTopPos;
-		slingSpringLine2->m_pointB = poleTopPos2;
-	}
+	/*
+	 bool key;
+	 hapticDevice->getUserSwitch(0, key);
+	 if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z) {
+	 slingSpringLine->m_pointB = projectile->getPos();
+	 slingSpringLine2->m_pointB = projectile->getPos();
+	 } else {
+	 slingSpringLine->m_pointB = poleTopPos;
+	 slingSpringLine2->m_pointB = poleTopPos2;
+	 }
+	 */
 
 	if (homerun) {
 		titleLabel->setPos(projectile->getPos());
@@ -705,6 +716,10 @@ void updateHaptics(void) {
 		simClock.reset();
 		simClock.start();
 
+		// init temp variable
+		cVector3d force;
+		force.zero();
+
 		cVector3d realPos;
 		cVector3d pos;
 		cVector3d virtualPos;
@@ -714,13 +729,21 @@ void updateHaptics(void) {
 		if (limitX) {
 			pos.x = 0;
 		}
+		if (pos.z < groundZ) {
+			pos.z = groundZ;
+		}
 
 		virtualPos = cAdd(center, cSub(pos, deviceCenter));
 		device->setPos(virtualPos);
 
-		// init temp variable
-		cVector3d force;
-		force.zero();
+		// Get vector from projectile to slingtop
+		cVector3d spring = cNegate(virtualPos);
+		double stretch = spring.length();
+		double stretchStep = stretch - prevStretch;
+		if (stretchStep < 0) {
+			stretchStep = -stretchStep;
+		}
+		spring = cNormalize(spring);
 
 		double vibrationIntensity = 0.0;
 
@@ -733,15 +756,22 @@ void updateHaptics(void) {
 			projectile->setPos(virtualPos);
 			projectileVel = cVector3d(0, 0, 0);
 
-			/* Activate spring */
-			// Get vector from projectile to slingtop
-			cVector3d spring = deviceCenter - pos;
-			double distance = spring.length();
+			slingCenter->setPos(virtualPos);
 
-			spring = cNormalize(spring);
+			/* Activate spring */
 
 			// Add spring force to allaround force
-			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
+			force.add(cAdd(cMul(slingSpringConst * stretch, spring), force));
+
+			// Add vibration
+			if (vibrate) {
+				vibrationIntensity = (1 - cos(M_PI * stretch / 2)) / 2;
+				//vibrationIntensity = pow(stretch / 2, 3);
+				if (stretchStep < vibrationStep) {
+					vibrationIntensity /= 5;
+				}
+				force.add(getVibrationForceVector(vibrationIntensity));
+			}
 
 			//			// Get another vector from projectile to another slingtop
 			//			spring = deviceCenter - pos;
@@ -752,32 +782,16 @@ void updateHaptics(void) {
 			//			// Add spring force to allaround force
 			//			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
 
-			// Add vibration
-			if (vibrate) {
-				vibrationIntensity = (1 - cos(M_PI * distance / 2)) / 2;
-				force.add(getVibrationForceVector(vibrationIntensity));
-			}
-
 			// add gravity to haptic device
 			cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
 			force.add(projectileGravity);
-
-			// Keep the projectile at/above ground level
-			cVector3d projectilePos = projectile->getPos();
-			if (projectilePos.z < groundZ) {
-				projectile->setPos(projectilePos.x, projectilePos.y, groundZ);
-			}
 		} else if (keyDown) {
 			// The key has been released
 			keyDown = false;
-			if (pos.z < poleTopPos.z) {
-				// The spring has been fired!
-				springFired = true;
-				projectileVel = cVector3d(0, 0, 0);
-				springFiredStep = 100000000; // ååh förlååååt förlååååååååt!!!
 
-				printf("FIRE!\n");
-			}
+			springFired = true;
+			projectileVel = cVector3d(0, 0, 0);
+			springFiredStep = 100000000; // ååh förlååååt förlååååååååt!!!
 
 		} else {
 			// Add gravitational force/acceleration to projectile - it's flying away bro
@@ -785,8 +799,16 @@ void updateHaptics(void) {
 			projectileVel.add(gravityStep);
 
 			// Pull the device to its initial position
-			cVector3d pullDirection = cSub(deviceCenter, pos);
-			force.add(cMul(deviceCenterForce, pullDirection));
+			cVector3d slingCenterPos = slingCenter->getPos();
+			cVector3d slingCenterAcc = cSub(deviceCenter, slingCenterPos);
+			slingCenterVel.add(cMul(timeInterval, slingCenterAcc));
+			double stiffness = slingCenterVel.length() * 0.4;
+			slingCenterVel.add(cMul(-stiffness, slingCenterVel));
+			slingCenterPos.add(slingCenterVel);
+			slingCenter->setPos(slingCenterPos);
+
+			// Pull the device towards the center
+			force.add(cAdd(cMul(deviceCenterForce * stretch, spring), force));
 
 			// make projectile stick to ground
 			cVector3d projPos = projectile->getPos();
@@ -825,6 +847,10 @@ void updateHaptics(void) {
 
 		}
 
+		// Update the slingshot graphcis
+		slingSpringLine->m_pointB = slingCenter->getPos();
+		slingSpringLine2->m_pointB = slingCenter->getPos();
+
 		// update position of projectile and shadow
 		projectile->setPos(cAdd(projectile->getPos(), projectileVel));
 		projectileShadow->setPos(projectile->getPos().x,
@@ -861,8 +887,10 @@ void updateHaptics(void) {
 		s << "Haptic force: " << force.str();
 		debugLabels[0]->m_string = s.str();
 		s.str("");
-		s << "Vibration intensity: " << vibrationIntensity;
+		s << "Stretch step: ";
 		debugLabels[1]->m_string = s.str();
+
+		prevStretch = stretch;
 	}
 
 	// exit haptics thread
@@ -905,7 +933,7 @@ cVector3d getVibrationForceVector(double intensity) {
 		intensity = 0;
 
 	return cVector3d(((double) random() / RAND_MAX) * intensity
-			* slingSpringConst, ((double) random() / RAND_MAX) * intensity
-			* slingSpringConst, ((double) random() / RAND_MAX) * intensity
-			* slingSpringConst);
+			* slingVibrationConst, ((double) random() / RAND_MAX) * intensity
+			* slingVibrationConst, ((double) random() / RAND_MAX) * intensity
+			* slingVibrationConst);
 }
