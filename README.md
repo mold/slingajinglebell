@@ -13,4 +13,5 @@ Todo
 - [x] Colors
   - Ground gradient (#565482 -> #64C16E ?)
   - Balls and shiet
+- [ ] Vibrate only when moving
 - [ ] Tweaking
