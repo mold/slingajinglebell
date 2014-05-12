@@ -14,7 +14,7 @@
 
  \author    <http://www.chai3d.org>
  \author    Francois Conti
- \authro	Daniel Molin
+ \author	Daniel Molin
  \author	John Brynte Turesson
  \version   (2.1.0 $Rev: 322 $) 0.1
  */
