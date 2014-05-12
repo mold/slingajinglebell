@@ -184,11 +184,16 @@ private:
 	cVector3d pos;
 	double radius;
 	cMesh* circle;
+	void resetGeometry();
+	double rotationAngle;
+	cVector3d rotationAxis;
+	cMaterial mat;
 public:
 	CircleMesh(cWorld*, cVector3d, double);
 	void setColor(double, double, double);
 	void setPos(cVector3d);
 	void rotate(cVector3d, double);
+	void setRadius(double);
 	virtual ~CircleMesh();
 };
 
@@ -196,9 +201,42 @@ CircleMesh::CircleMesh(cWorld *world, cVector3d pos, double radius) {
 	this->pos = pos;
 	this->radius = radius;
 
-	// create circle mesh
+	resetGeometry();
+}
+
+void CircleMesh::setColor(double r, double g, double b) {
+	// define some material properties and apply to mesh
+	cMaterial mat;
+	mat.m_ambient.set(r, g, b);
+	mat.m_diffuse.set(r, g, b);
+	mat.m_specular.set(r, g, b);
+	circle->setMaterial(mat);
+	this->mat = mat;
+}
+
+void CircleMesh::setPos(cVector3d pos) {
+	this->pos = pos;
+	circle->setPos(pos);
+}
+
+void CircleMesh::rotate(cVector3d axis, double angle) {
+	this->rotationAxis = axis;
+	this->rotationAngle = angle;
+	circle->rotate(axis, angle);
+}
+
+void CircleMesh::setRadius(double radius) {
+	this->radius = radius;
+	resetGeometry();
+}
+
+/**
+ * Removes all triangles and creates them anew
+ * (great when the radius has been changed for example!)
+ */
+void CircleMesh::resetGeometry() {
+	world->removeChild(circle);
 	circle = new cMesh(world);
-	world->addChild(circle);
 
 	int res = 40;
 	double step = 2 * M_PI / res;
@@ -216,25 +254,12 @@ CircleMesh::CircleMesh(cWorld *world, cVector3d pos, double radius) {
 		}
 	}
 
+	circle->setPos(this->pos);
+	circle->rotate(this->rotationAxis, this->rotationAngle);
+	circle->setMaterial(this->mat);
 	circle->computeAllNormals();
-	circle->setPos(pos);
-}
 
-void CircleMesh::setColor(double r, double g, double b) {
-	// define some material properties and apply to mesh
-	cMaterial mat;
-	mat.m_ambient.set(r, g, b);
-	mat.m_diffuse.set(r, g, b);
-	mat.m_specular.set(r, g, b);
-	circle->setMaterial(mat);
-}
-
-void CircleMesh::setPos(cVector3d pos) {
-	circle->setPos(pos);
-}
-
-void CircleMesh::rotate(cVector3d axis, double angle) {
-	circle->rotate(axis, angle);
+	world->addChild(circle);
 }
 
 CircleMesh::~CircleMesh() {
@@ -284,6 +309,9 @@ Target::~Target() {
 
 // Targets
 Target *targets[3];
+
+// projectile shadow
+CircleMesh* projectileShadowCircle;
 
 //===========================================================================
 /*
@@ -418,22 +446,11 @@ int main(int argc, char* argv[]) {
 	projectile->m_material.setShininess(50);
 
 	// Shadow!
-	projectileShadow = new cMesh(world);
-	world->addChild(projectileShadow);
-	float shadowRadius = projectileRadius * 0.7;
-	int sv0 = projectileShadow->newVertex(-shadowRadius, -shadowRadius, 0.0);
-	int sv1 = projectileShadow->newVertex(shadowRadius, -shadowRadius, 0.0);
-	int sv2 = projectileShadow->newVertex(shadowRadius, shadowRadius, 0.0);
-	int sv3 = projectileShadow->newVertex(-shadowRadius, shadowRadius, 0.0);
-	cColorf* shC = new cColorf(20, 200, 0, 0.3);
-	projectileShadow->setVertexColor(*shC, true);
-	projectileShadow->setUseVertexColors(true, true);
-
-	projectileShadow->newTriangle(sv0, sv1, sv2);
-	projectileShadow->newTriangle(sv0, sv2, sv3);
-	projectileShadow->computeAllNormals();
-	projectileShadow->setPos(0.0, 0.0, groundZ + 0.0001);
-	std::cout << projectileShadow->getColorsEnabled() << std::endl;
+	projectileShadowCircle = new CircleMesh(world, cVector3d(0.0, 0.0, groundZ
+			+ 0.0001), 0.2);
+	projectileShadowCircle->rotate(cVector3d(0, 1, 0),
+			-3.141592653589793238462643383 / 2.0);
+	projectileShadowCircle->setColor(20, 200, 0);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create a Ground
@@ -508,7 +525,8 @@ int main(int argc, char* argv[]) {
 	//////////////////////////////////////////////////////////////////////////
 	for (int i = 0; i < 3; i++)
 		targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
-				/ RAND_MAX) * 3), 0.5-((double) random() / RAND_MAX)*1, 0.5-((double) random() / RAND_MAX)*1), 0.2);
+				/ RAND_MAX) * 3), 0.5 - ((double) random() / RAND_MAX) * 1, 0.5
+				- ((double) random() / RAND_MAX) * 1), 0.2);
 
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
@@ -665,6 +683,12 @@ void updateGraphics(void) {
 				(double) random() / RAND_MAX, (double) random() / RAND_MAX);
 
 	}
+
+	// update shadow size and position
+	projectileShadowCircle->setPos(cVector3d(projectile->getPos().x,
+			projectile->getPos().y, groundZ + 0.0001));
+	projectileShadowCircle->setRadius(projectileRadius
+			/ (projectile->getPos().z + 2));
 
 	// render world
 	camera->renderView(displayW, displayH);
@@ -825,10 +849,8 @@ void updateHaptics(void) {
 
 		}
 
-		// update position of projectile and shadow
+		// update position of projectile (shadow moves in updateGraphics)
 		projectile->setPos(cAdd(projectile->getPos(), projectileVel));
-		projectileShadow->setPos(projectile->getPos().x,
-				projectile->getPos().y, groundZ + 0.0001);
 
 		/** PRINT INFO **/
 		/*string posStr;
