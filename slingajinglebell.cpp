@@ -124,8 +124,8 @@ double deviceRadius;
 cVector3d projectileVel;
 cShapeSphere* projectile;
 double projectileRadius = 0.1;
-double projectileMass = 10;
-bool collided = false;	// Has the projectile collided with a target???
+double projectileMass = 15;
+bool collided = false; // Has the projectile collided with a target???
 
 // Slingshot
 cShapeLine* slingSpringLine;
@@ -136,7 +136,7 @@ cShapeSphere* slingCenter;
 cVector3d slingCenterVel(0, 0, 0);
 bool springFired = false;
 double prevStretch = 0;
-double slingSpringConst = 20;
+double slingSpringConst = 30;
 double slingVibrationConst = 8;
 double vibrationStep = 0.001;
 
@@ -157,10 +157,10 @@ cVector3d deviceCenter;
 
 // Target data
 const int TARGETS = 3;
+
 const double TARGET_RADIUS = 0.1;
-double targetPositions[][9] = {
-		{ -3, 0.6, 0.3, -3,-0.6,0.3, -5,0,0 },
-		{ -2, 0.8, 0.2, -3, -0.4, 0.1, -12, 0.4, 0.4 } };
+double targetPositions[][9] = { { -3, 0.6, 0.3, -3, -0.6, 0.3, -5, 0, 0 }, {
+		-2, 0.8, 0.2, -3, -0.4, 0.1, -12, 0.4, 0.4 } };
 int levels = 2;
 int level = 0;
 
@@ -904,13 +904,13 @@ void updateHaptics(void) {
 		if (springFired) {
 			cVector3d projectilePos = projectile->getPos();
 
-			double length = cSub(projectilePos, poleTopPos).length();
+			double length = cSub(projectilePos, center).length();
 			if (length < springFiredStep) {
 				springFiredStep = length;
 
 				// Get vector from projectile to slingtop
 				cVector3d acc = poleTopPos - projectile->getPos();
-				double distance = acc.length();
+				double distance = acc.length() * slingSpringConst / 2;
 				cVector3d springForce = cDiv(projectileMass, acc);
 				// apply the force to the sling force
 				springForce.mul(timeInterval);
@@ -918,7 +918,7 @@ void updateHaptics(void) {
 
 				// Get another vector from projectile to another slingtop
 				acc = poleTopPos2 - projectile->getPos();
-				distance = acc.length();
+				distance = acc.length() * slingSpringConst / 2;
 				springForce = cDiv(projectileMass, acc);
 				// apply the second force to the sling force
 				springForce.mul(timeInterval);
@@ -958,20 +958,20 @@ void updateHaptics(void) {
 		// Check collision with targets
 		bool collision = true;
 		for (int i = 0; i < TARGETS; i++) {
-			currentTargets[i]->sphereCollide(
-								projectile);
+			currentTargets[i]->sphereCollide(projectile);
 			collision = collision && currentTargets[i]->hasCollided();
 		}
 		if (collision) {
 			setNextLevel();
 		}
-		if(!collided){
-		for (int i = 0; i < 3; i++) {
-			if (currentTargets[i]->hasCollided()) {
-				projectileVel = cVector3d();
-				collided = true;
+		if (!collided) {
+			for (int i = 0; i < 3; i++) {
+				if (currentTargets[i]->hasCollided()) {
+					projectileVel = cVector3d();
+					collided = true;
+				}
 			}
-		}}
+		}
 
 		std::ostringstream s;
 		s << "Haptic force: " << force.str();
