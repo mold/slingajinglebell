@@ -134,8 +134,8 @@ cShapeSphere* slingCenter;
 cVector3d slingCenterVel(0, 0, 0);
 bool springFired = false;
 double prevStretch = 0;
-double slingSpringConst = 30;
-double slingVibrationConst = 10;
+double slingSpringConst = 20;
+double slingVibrationConst = 8;
 double vibrationStep = 0.001;
 
 // Floor grid
@@ -152,6 +152,14 @@ bool vibrate = true;
 
 double deviceCenterForce = 10;
 cVector3d deviceCenter;
+
+// Target data
+double targetPositions[][] = {
+	{-0.3,5, 0.3,5, 0,10},
+	{-0.6,3, 0.6,3, 0,15}
+};
+int levels = 2;
+int level = 1;
 
 //---------------------------------------------------------------------------
 // DECLARED FUNCTIONS
@@ -313,7 +321,7 @@ Target::~Target() {
 }
 
 // Targets
-Target *targets[3];
+Target* currentTargets[];
 
 // projectile shadow
 CircleMesh* projectileShadowCircle;
@@ -528,14 +536,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-	// Create some targets
-	//////////////////////////////////////////////////////////////////////////
-	for (int i = 0; i < 3; i++)
-		targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
-				/ RAND_MAX) * 3), 0.5 - ((double) random() / RAND_MAX) * 1, 0.5
-				- ((double) random() / RAND_MAX) * 1), 0.2);
-
 	//-----------------------------------------------------------------------
 	// OPEN GL - WINDOW DISPLAY
 	//-----------------------------------------------------------------------
@@ -572,6 +572,8 @@ int main(int argc, char* argv[]) {
 	// START SIMULATION
 	//-----------------------------------------------------------------------
 
+	setLevel(level);
+
 	// simulation in now running
 	simulationRunning = true;
 
@@ -587,6 +589,32 @@ int main(int argc, char* argv[]) {
 
 	// exit
 	return (0);
+}
+
+//---------------------------------------------------------------------------
+
+void setNextLevel() {
+	if (level == levels) {
+		// Do something when the game has ended
+	} else {
+		setLevel(level + 1);
+	}
+}
+
+//---------------------------------------------------------------------------
+
+void setLevel(int lvl) {
+	level = lvl;
+	if (level > levels || level < 0) {
+		level = 0;
+	}
+
+	// Initialize everything
+	int targets
+	for (int i = 0; i < 3; i++) {
+			targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
+					/ RAND_MAX) * 3), 0.5 - ((double) random() / RAND_MAX) * 1, 0.5
+					- ((double) random() / RAND_MAX) * 1), 0.2);
 }
 
 //---------------------------------------------------------------------------
