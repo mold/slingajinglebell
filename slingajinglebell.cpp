@@ -121,7 +121,6 @@ double deviceRadius;
 // Projectile
 cVector3d projectileVel;
 cShapeSphere* projectile;
-cMesh* projectileShadow;
 double projectileRadius = 0.1;
 double projectileMass = 10;
 
