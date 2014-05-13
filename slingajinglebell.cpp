@@ -155,12 +155,12 @@ cVector3d deviceCenter;
 
 // Target data
 const int TARGETS = 3;
-const double TARGET_RADIUS = 0.2;
+const double TARGET_RADIUS = 0.1;
 double targetPositions[][9] = {
-		{ -5, 0.1, 0.3, 0,0,0,0,0,0 },
-		{ -3, 0.6, 0.2, -3, 0.6, 0.2, -15, 0, 0.4 } };
+		{ -3, 0.6, 0.3, -3,-0.6,0.3, -5,0,0 },
+		{ -2, 0.8, 0.2, -3, -0.4, 0.1, -12, 0.4, 0.4 } };
 int levels = 2;
-int level = 1;
+int level = 0;
 
 //---------------------------------------------------------------------------
 // DECLARED FUNCTIONS
@@ -639,14 +639,15 @@ void setLevel(int lvl) {
 	// Remove any existing targets
 	if (lvl != -1) {
 		for (int i = 0; i < TARGETS; i++) {
-			//currentTargets[i]->remove();
+			currentTargets[i]->remove();
 		}
 	}
 
 	level = lvl;
-	if (level > levels || level < 1) {
-		level = 1;
+	if (level >= levels || level < 0) {
+		level = 0;
 	}
+	printf("Level %i", level);
 
 	// Initialize everything
 	for (int i = 0; i < TARGETS; i++) {
@@ -656,7 +657,7 @@ void setLevel(int lvl) {
 						+ 2]), TARGET_RADIUS);
 	}
 	projectileVel.zero();
-	projectile->setPos(cVector3d());
+	projectile->setPos(cVector3d(0, 0, groundZ));
 }
 
 //---------------------------------------------------------------------------
