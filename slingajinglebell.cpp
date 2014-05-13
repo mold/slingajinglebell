@@ -96,8 +96,6 @@ bool limitX = false;
 bool homerun = false;
 cLabel* titleLabel;
 
-cLabel* debugLabels[2];
-
 const double CAMERA_X = 3.8;
 
 //---------------------------------------------------------------------------
@@ -124,7 +122,7 @@ double deviceRadius;
 cVector3d projectileVel;
 cShapeSphere* projectile;
 double projectileRadius = 0.1;
-double projectileMass = 15;
+double projectileMass = 10;
 bool collided = false; // Has the projectile collided with a target???
 
 // Slingshot
@@ -158,7 +156,7 @@ cVector3d deviceCenter;
 // Target data
 const int TARGETS = 3;
 
-const double TARGET_RADIUS = 0.1;
+const double TARGET_RADIUS = 0.2;
 double targetPositions[][9] = { { -3, 0.6, 0.3, -3, -0.6, 0.3, -5, 0, 0 }, {
 		-2, 0.8, 0.2, -3, -0.4, 0.1, -12, 0.4, 0.4 } };
 int levels = 2;
@@ -529,17 +527,6 @@ int main(int argc, char* argv[]) {
 	ground->setPos(0.0, 0.0, groundZ);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Debugging
-	//////////////////////////////////////////////////////////////////////////
-
-	for (int i = 0; i < 2; i++) {
-		debugLabels[i] = new cLabel();
-		// The position is fucking arbitrary, dependent on the camera
-		debugLabels[i]->setPos(0, -0.6, 0.8 - 0.06 * i);
-		world->addChild(debugLabels[i]);
-	}
-
-	//////////////////////////////////////////////////////////////////////////
 	// Create a floor grid matrix (good ol' fashioned)
 	//////////////////////////////////////////////////////////////////////////
 
@@ -649,7 +636,7 @@ void setLevel(int lvl) {
 	if (level >= levels || level < 0) {
 		level = 0;
 	}
-	printf("Level %i", level);
+	printf("Level %i\n", level);
 
 	// Initialize everything
 	for (int i = 0; i < TARGETS; i++) {
@@ -833,7 +820,7 @@ void updateHaptics(void) {
 		if (stretchStep < 0) {
 			stretchStep = -stretchStep;
 		}
-		spring = cNormalize(spring);
+		spring.normalize();
 
 		double vibrationIntensity = 0.0;
 
@@ -865,8 +852,9 @@ void updateHaptics(void) {
 			}
 
 			// add gravity to haptic device
-			cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
-			force.add(projectileGravity);
+			// TODO: This does not give the required effect
+			//cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
+			//force.add(projectileGravity);
 		} else if (keyDown) {
 			// The key has been released
 			keyDown = false;
@@ -882,7 +870,7 @@ void updateHaptics(void) {
 
 			// Pull the device to its initial position
 			cVector3d slingCenterPos = slingCenter->getPos();
-			cVector3d slingCenterAcc = cSub(deviceCenter, slingCenterPos);
+			cVector3d slingCenterAcc = cNegate(slingCenterPos);
 			slingCenterVel.add(cMul(timeInterval, slingCenterAcc));
 			double stiffness = slingCenterVel.length() * 0.8;
 			slingCenterVel.sub(cMul(stiffness, slingCenterVel));
@@ -972,13 +960,6 @@ void updateHaptics(void) {
 				}
 			}
 		}
-
-		std::ostringstream s;
-		s << "Haptic force: " << force.str();
-		debugLabels[0]->m_string = s.str();
-		s.str("");
-		s << "Stretch step: ";
-		debugLabels[1]->m_string = s.str();
 
 		prevStretch = stretch;
 	}
