@@ -121,9 +121,9 @@ double deviceRadius;
 // Projectile
 cVector3d projectileVel;
 cShapeSphere* projectile;
-cMesh* projectileShadow;
 double projectileRadius = 0.1;
 double projectileMass = 10;
+bool collided = false;	// Has the projectile collided with a target???
 
 // Slingshot
 cShapeLine* slingSpringLine;
@@ -303,6 +303,7 @@ public:
 	bool sphereCollide(cShapeSphere*);
 	void setColor(double, double, double);
 	void remove();
+	bool hasCollided();
 	virtual ~Target();
 };
 
@@ -338,6 +339,10 @@ void Target::setColor(double r, double g, double b) {
 void Target::remove() {
 	target->remove();
 	world->removeChild(line);
+}
+
+bool Target::hasCollided() {
+	return collided;
 }
 
 Target::~Target() {
@@ -740,18 +745,6 @@ void close(void) {
 //---------------------------------------------------------------------------
 
 void updateGraphics(void) {
-	/*
-	 bool key;
-	 hapticDevice->getUserSwitch(0, key);
-	 if ((key || springFired) && (projectile->getPos()).z < poleTopPos.z) {
-	 slingSpringLine->m_pointB = projectile->getPos();
-	 slingSpringLine2->m_pointB = projectile->getPos();
-	 } else {
-	 slingSpringLine->m_pointB = poleTopPos;
-	 slingSpringLine2->m_pointB = poleTopPos2;
-	 }
-	 */
-
 	if (homerun) {
 		titleLabel->setPos(projectile->getPos());
 		titleLabel->m_fontColor.set((double) random() / RAND_MAX,
@@ -839,6 +832,7 @@ void updateHaptics(void) {
 		hapticDevice->getUserSwitch(0, key);
 		if (key) {
 			keyDown = true;
+			collided = false;
 			springFired = false;
 			// Set the projectile virutal position
 			projectile->setPos(virtualPos);
@@ -861,15 +855,6 @@ void updateHaptics(void) {
 				force.add(getVibrationForceVector(vibrationIntensity));
 			}
 
-			//			// Get another vector from projectile to another slingtop
-			//			spring = deviceCenter - pos;
-			//			distance = spring.length();
-			//
-			//			spring = cNormalize(spring);
-			//
-			//			// Add spring force to allaround force
-			//			force.add(cAdd(cMul(slingSpringConst * distance, spring), force));
-
 			// add gravity to haptic device
 			cVector3d projectileGravity = cMul(projectileMass * 30, GRAVITY);
 			force.add(projectileGravity);
@@ -890,8 +875,8 @@ void updateHaptics(void) {
 			cVector3d slingCenterPos = slingCenter->getPos();
 			cVector3d slingCenterAcc = cSub(deviceCenter, slingCenterPos);
 			slingCenterVel.add(cMul(timeInterval, slingCenterAcc));
-			double stiffness = slingCenterVel.length() * 0.4;
-			slingCenterVel.add(cMul(-stiffness, slingCenterVel));
+			double stiffness = slingCenterVel.length() * 0.8;
+			slingCenterVel.sub(cMul(stiffness, slingCenterVel));
 			slingCenterPos.add(slingCenterVel);
 			slingCenter->setPos(slingCenterPos);
 
@@ -929,6 +914,8 @@ void updateHaptics(void) {
 				// apply the second force to the sling force
 				springForce.mul(timeInterval);
 				projectileVel.add(springForce);
+
+				slingCenterVel.copyfrom(projectileVel);
 			} else {
 				springFired = false;
 			}
@@ -962,12 +949,20 @@ void updateHaptics(void) {
 		// Check collision with targets
 		bool collision = true;
 		for (int i = 0; i < TARGETS; i++) {
-			collision = collision && currentTargets[i]->sphereCollide(
-					projectile);
+			currentTargets[i]->sphereCollide(
+								projectile);
+			collision = collision && currentTargets[i]->hasCollided();
 		}
 		if (collision) {
 			setNextLevel();
 		}
+		if(!collided){
+		for (int i = 0; i < 3; i++) {
+			if (currentTargets[i]->hasCollided()) {
+				projectileVel = cVector3d();
+				collided = true;
+			}
+		}}
 
 		std::ostringstream s;
 		s << "Haptic force: " << force.str();

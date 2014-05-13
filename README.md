@@ -6,7 +6,7 @@ Todo
 - [x] Fix buggy areas
   - Top right corner, what is up????
 - [x] Two slangs and one bella
-- [ ] Targets + physics
+- [x] Targets + physics
 - [x] Depth (matrix? poles? holes? guacamoles?)
 - [ ] Sound
 - [ ] Bouncy ropes
