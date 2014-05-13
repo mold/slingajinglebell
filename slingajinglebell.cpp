@@ -154,10 +154,11 @@ double deviceCenterForce = 10;
 cVector3d deviceCenter;
 
 // Target data
-double targetPositions[][] = {
-	{-0.3,5, 0.3,5, 0,10},
-	{-0.6,3, 0.6,3, 0,15}
-};
+const int TARGETS = 3;
+const double TARGET_RADIUS = 0.2;
+double targetPositions[][9] = {
+		{ -5, 0.1, 0.3, 0,0,0,0,0,0 },
+		{ -3, 0.6, 0.2, -3, 0.6, 0.2, -15, 0, 0.4 } };
 int levels = 2;
 int level = 1;
 
@@ -194,6 +195,7 @@ cVector3d getVibrationForceVector(double intensity);
 //////////////////////////////////////////
 class CircleMesh {
 private:
+	cWorld* world;
 	cVector3d pos;
 	double radius;
 	cMesh* circle;
@@ -207,10 +209,12 @@ public:
 	void setPos(cVector3d);
 	void rotate(cVector3d, double);
 	void setRadius(double);
+	void remove();
 	virtual ~CircleMesh();
 };
 
 CircleMesh::CircleMesh(cWorld *world, cVector3d pos, double radius) {
+	this->world = world;
 	this->pos = pos;
 	this->radius = radius;
 
@@ -275,6 +279,10 @@ void CircleMesh::resetGeometry() {
 	world->addChild(circle);
 }
 
+void CircleMesh::remove() {
+	world->removeChild(circle);
+}
+
 CircleMesh::~CircleMesh() {
 
 }
@@ -284,17 +292,23 @@ CircleMesh::~CircleMesh() {
 //////////////////////////////////////////
 class Target {
 private:
+	bool collided;
 	cVector3d pos;
 	double radius;
 	CircleMesh* target;
+	cShapeLine* line;
+	cWorld* world;
 public:
 	Target(cWorld*, cVector3d, double);
 	bool sphereCollide(cShapeSphere*);
 	void setColor(double, double, double);
+	void remove();
 	virtual ~Target();
 };
 
 Target::Target(cWorld *world, cVector3d pos, double radius) {
+	collided = false;
+	this->world = world;
 	this->pos = pos;
 	this->radius = radius;
 	target = new CircleMesh(world, pos, radius);
@@ -303,17 +317,27 @@ Target::Target(cWorld *world, cVector3d pos, double radius) {
 	cVector3d floor;
 	floor.copyfrom(pos);
 	floor.z = groundZ;
-	cShapeLine* line = new cShapeLine(floor, pos);
+	line = new cShapeLine(floor, pos);
 	world->addChild(line);
 }
 
 bool Target::sphereCollide(cShapeSphere *sphere) {
 	double distance = (cSub(sphere->getPos(), pos)).length();
-	return distance < radius + sphere->getRadius();
+	bool col = distance < radius + sphere->getRadius();
+	if (col) {
+		collided = true;
+		target->setColor(1, 0, 0);
+	}
+	return col;
 }
 
 void Target::setColor(double r, double g, double b) {
 	target->setColor(r, g, b);
+}
+
+void Target::remove() {
+	target->remove();
+	world->removeChild(line);
 }
 
 Target::~Target() {
@@ -321,10 +345,12 @@ Target::~Target() {
 }
 
 // Targets
-Target* currentTargets[];
+Target* currentTargets[3];
 
 // projectile shadow
 CircleMesh* projectileShadowCircle;
+
+void setLevel(int);
 
 //===========================================================================
 /*
@@ -572,7 +598,8 @@ int main(int argc, char* argv[]) {
 	// START SIMULATION
 	//-----------------------------------------------------------------------
 
-	setLevel(level);
+	// initialize the first level
+	setLevel(-1);
 
 	// simulation in now running
 	simulationRunning = true;
@@ -604,17 +631,27 @@ void setNextLevel() {
 //---------------------------------------------------------------------------
 
 void setLevel(int lvl) {
+	// Remove any existing targets
+	if (lvl != -1) {
+		for (int i = 0; i < TARGETS; i++) {
+			//currentTargets[i]->remove();
+		}
+	}
+
 	level = lvl;
-	if (level > levels || level < 0) {
-		level = 0;
+	if (level > levels || level < 1) {
+		level = 1;
 	}
 
 	// Initialize everything
-	int targets
-	for (int i = 0; i < 3; i++) {
-			targets[i] = new Target(world, cVector3d(-(2 + ((double) random()
-					/ RAND_MAX) * 3), 0.5 - ((double) random() / RAND_MAX) * 1, 0.5
-					- ((double) random() / RAND_MAX) * 1), 0.2);
+	for (int i = 0; i < TARGETS; i++) {
+		currentTargets[i] = new Target(world, cVector3d(
+				targetPositions[level][i * 3],
+				targetPositions[level][i * 3 + 1], targetPositions[level][i * 3
+						+ 2]), TARGET_RADIUS);
+	}
+	projectileVel.zero();
+	projectile->setPos(cVector3d());
 }
 
 //---------------------------------------------------------------------------
@@ -923,13 +960,13 @@ void updateHaptics(void) {
 		hapticDevice->setForce(force);
 
 		// Check collision with targets
-		for (int i = 0; i < 3; i++) {
-			if (targets[i]->sphereCollide(projectile)) {
-				projectileVel = cVector3d();
-				targets[i]->setColor(1, 0, 0);
-			} else {
-				targets[i]->setColor(0, 1, 0);
-			}
+		bool collision = true;
+		for (int i = 0; i < TARGETS; i++) {
+			collision = collision && currentTargets[i]->sphereCollide(
+					projectile);
+		}
+		if (collision) {
+			setNextLevel();
 		}
 
 		std::ostringstream s;
