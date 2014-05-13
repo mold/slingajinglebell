@@ -98,6 +98,8 @@ cLabel* titleLabel;
 
 cLabel* debugLabels[2];
 
+const double CAMERA_X = 3.8;
+
 //---------------------------------------------------------------------------
 // DECLARED MACROS
 //---------------------------------------------------------------------------
@@ -393,7 +395,7 @@ int main(int argc, char* argv[]) {
 	world->addChild(camera);
 
 	// position and orient the camera
-	camera->set(cVector3d(3.8, 0.0, 0.0), // camera position (eye)
+	camera->set(cVector3d(CAMERA_X, 0.0, 0.0), // camera position (eye)
 			cVector3d(0.0, 0.0, 0.0), // look-at position (target)
 			cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
 
@@ -814,6 +816,12 @@ void updateHaptics(void) {
 		if (pos.z < groundZ) {
 			pos.z = groundZ;
 		}
+
+		// Update the camera
+		// position and orient the camera
+		camera->set(cVector3d(CAMERA_X, pos.y/6, pos.z/6), // camera position (eye)
+				cVector3d(0.0, 0.0, 0.0), // look-at position (target)
+				cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
 
 		virtualPos = cAdd(center, cSub(pos, deviceCenter));
 		device->setPos(virtualPos);
