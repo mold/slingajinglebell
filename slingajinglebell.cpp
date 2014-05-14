@@ -157,10 +157,25 @@ cVector3d deviceCenter;
 const int TARGETS = 3;
 
 const double TARGET_RADIUS = 0.2;
-double targetPositions[][9] = { { -3, 0.6, 0.3, -3, -0.6, 0.3, -5, 0, 0 }, {
-		-2, 0.8, 0.2, -3, -0.4, 0.1, -12, 0.4, 0.4 } };
-int levels = 2;
+double targetPositions[][9] = {
+		{ 10,0,0,10,0,0,10,0,0 }, // 0
+		{ -3, 1, 0, -3, -1, 0, -3, 0, 0 }, // 1
+		{ -3, 0.8, -0.5, -3, -0.8, 0.4, -3, 0, -0.2 }, // 2
+		{ -1, 1, 0, -8, -1, 0, -4.5, 0, 0 }, // 3
+		{ -7, 1, groundZ, -8, -1, groundZ, -6, 0.4, 0 }, // 4
+		{ -7, 1, -0.6, -15, -2, 0.5, -10, 0.2, groundZ } // 5
+};
+int levels = 6;
 int level = 0;
+
+// Delay
+bool delay = false;
+double timer;
+double SLEEP_TIME = 1;
+
+// Data collecting
+double levelTimer;
+int thrownBalls;
 
 //---------------------------------------------------------------------------
 // DECLARED FUNCTIONS
@@ -304,6 +319,7 @@ public:
 	void setColor(double, double, double);
 	void remove();
 	bool hasCollided();
+	void rotate();
 	virtual ~Target();
 };
 
@@ -345,6 +361,10 @@ bool Target::hasCollided() {
 	return collided;
 }
 
+void Target::rotate() {
+	target->rotate(cVector3d(0, 1, 0), -M_PI/2);
+}
+
 Target::~Target() {
 
 }
@@ -356,6 +376,7 @@ Target* currentTargets[3];
 CircleMesh* projectileShadowCircle;
 
 void setLevel(int);
+void setHomerun(bool);
 
 //===========================================================================
 /*
@@ -625,6 +646,8 @@ void setNextLevel() {
 //---------------------------------------------------------------------------
 
 void setLevel(int lvl) {
+	setHomerun(false);
+
 	// Remove any existing targets
 	if (lvl != -1) {
 		for (int i = 0; i < TARGETS; i++) {
@@ -636,7 +659,6 @@ void setLevel(int lvl) {
 	if (level >= levels || level < 0) {
 		level = 0;
 	}
-	printf("Level %i\n", level);
 
 	// Initialize everything
 	for (int i = 0; i < TARGETS; i++) {
@@ -644,9 +666,16 @@ void setLevel(int lvl) {
 				targetPositions[level][i * 3],
 				targetPositions[level][i * 3 + 1], targetPositions[level][i * 3
 						+ 2]), TARGET_RADIUS);
+		if (targetPositions[level][i*3+2] == groundZ) {
+			currentTargets[i]->rotate();
+		}
 	}
 	projectileVel.zero();
 	projectile->setPos(cVector3d(0, 0, groundZ));
+
+	// Reset timer and counter
+	levelTimer = 0;
+	thrownBalls = 0;
 }
 
 //---------------------------------------------------------------------------
@@ -674,29 +703,34 @@ void keySelect(unsigned char key, int x, int y) {
 		vibrate = !vibrate;
 	} else if (key == 'h') {
 		// HOMERUUUN
-		homerun = !homerun;
-		printf("homerun?)\n");
-		if (homerun) {
-			printf("homerun!\n");
-			// create a small label as title
-			titleLabel = new cLabel();
+		setHomerun(!homerun);
 
-			cFont* font = cFont::createFont();
-			font->setPointSize(200);
-			font->setFontFace("Monospace");
-			font = cFont::createFont(font);
+	} else if (key == 'n') {
+		setNextLevel();
+	}
+}
 
-			// define its position, color and string message, and font
-			titleLabel->setPos(0, 0, 0);
-			titleLabel->m_fontColor.set((double) random() / RAND_MAX,
-					(double) random() / RAND_MAX, (double) random() / RAND_MAX);
-			titleLabel->m_string = "HOMERUN!";
-			titleLabel->m_font = font;
+void setHomerun(bool home) {
+	homerun = home;
+	if (homerun) {
+		// create a small label as title
+		titleLabel = new cLabel();
 
-			world->addChild(titleLabel);
-		} else {
-			world->removeChild(titleLabel);
-		}
+		cFont* font = cFont::createFont();
+		font->setPointSize(200);
+		font->setFontFace("Monospace");
+		font = cFont::createFont(font);
+
+		// define its position, color and string message, and font
+		titleLabel->setPos(0, 0, 0);
+		titleLabel->m_fontColor.set((double) random() / RAND_MAX,
+				(double) random() / RAND_MAX, (double) random() / RAND_MAX);
+		titleLabel->m_string = "HOMERUN!";
+		titleLabel->m_font = font;
+
+		world->addChild(titleLabel);
+	} else {
+		world->removeChild(titleLabel);
 	}
 }
 
@@ -787,6 +821,9 @@ void updateHaptics(void) {
 		simClock.reset();
 		simClock.start();
 
+		// Update level timer
+		levelTimer += timeInterval;
+
 		// init temp variable
 		cVector3d force;
 		force.zero();
@@ -806,7 +843,7 @@ void updateHaptics(void) {
 
 		// Update the camera
 		// position and orient the camera
-		camera->set(cVector3d(CAMERA_X, pos.y/6, pos.z/6), // camera position (eye)
+		camera->set(cVector3d(CAMERA_X, pos.y / 6, pos.z / 6), // camera position (eye)
 				cVector3d(0.0, 0.0, 0.0), // look-at position (target)
 				cVector3d(0.0, 0.0, 1.0)); // direction of the "up" vector
 
@@ -826,7 +863,7 @@ void updateHaptics(void) {
 
 		bool key;
 		hapticDevice->getUserSwitch(0, key);
-		if (key) {
+		if (key && !delay) {
 			keyDown = true;
 			collided = false;
 			springFired = false;
@@ -862,6 +899,8 @@ void updateHaptics(void) {
 			springFired = true;
 			projectileVel = cVector3d(0, 0, 0);
 			springFiredStep = 100000000; // ååh förlååååt förlååååååååt!!!
+
+			thrownBalls++;
 
 		} else {
 			// Add gravitational force/acceleration to projectile - it's flying away bro
@@ -949,15 +988,29 @@ void updateHaptics(void) {
 			currentTargets[i]->sphereCollide(projectile);
 			collision = collision && currentTargets[i]->hasCollided();
 		}
-		if (collision) {
-			setNextLevel();
+		if (collision && !delay) {
+			// SUCCESS
+			setHomerun(true);
+			delay = true;
+			timer = 0;
+
+			printf("%i;%f;%i\n", level, levelTimer, thrownBalls);
 		}
 		if (!collided) {
 			for (int i = 0; i < 3; i++) {
-				if (currentTargets[i]->hasCollided()) {
+				if (currentTargets[i]->sphereCollide(projectile)) {
 					projectileVel = cVector3d();
 					collided = true;
 				}
+			}
+		}
+
+		// check the delay
+		if (delay) {
+			timer += timeInterval;
+			if (timer > SLEEP_TIME) {
+				delay = false;
+				setNextLevel();
 			}
 		}
 
