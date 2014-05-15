@@ -137,6 +137,7 @@ double prevStretch = 0;
 double slingSpringConst = 30;
 double slingVibrationConst = 8;
 double vibrationStep = 0.001;
+bool sendForce = true;
 
 // Floor grid
 const int gridLineNumber = 80;
@@ -157,8 +158,7 @@ cVector3d deviceCenter;
 const int TARGETS = 3;
 
 const double TARGET_RADIUS = 0.2;
-double targetPositions[][9] = {
-		{ 10,0,0,10,0,0,10,0,0 }, // 0
+double targetPositions[][9] = { { 10, 0, 0, 10, 0, 0, 10, 0, 0 }, // 0
 		{ -3, 1, 0, -3, -1, 0, -3, 0, 0 }, // 1
 		{ -3, 0.8, -0.5, -3, -0.8, 0.4, -3, 0, -0.2 }, // 2
 		{ -1, 1, 0, -8, -1, 0, -4.5, 0, 0 }, // 3
@@ -362,7 +362,7 @@ bool Target::hasCollided() {
 }
 
 void Target::rotate() {
-	target->rotate(cVector3d(0, 1, 0), -M_PI/2);
+	target->rotate(cVector3d(0, 1, 0), -M_PI / 2);
 }
 
 Target::~Target() {
@@ -666,7 +666,7 @@ void setLevel(int lvl) {
 				targetPositions[level][i * 3],
 				targetPositions[level][i * 3 + 1], targetPositions[level][i * 3
 						+ 2]), TARGET_RADIUS);
-		if (targetPositions[level][i*3+2] == groundZ) {
+		if (targetPositions[level][i * 3 + 2] == groundZ) {
 			currentTargets[i]->rotate();
 		}
 	}
@@ -699,14 +699,18 @@ void keySelect(unsigned char key, int x, int y) {
 		exit(0);
 	} else if (key == '1') {
 		limitX = !limitX;
+		std::cout << "limitx: " << limitX << std::endl;
 	} else if (key == 'v') {
 		vibrate = !vibrate;
+		std::cout << "vibrate: " << vibrate << std::endl;
 	} else if (key == 'h') {
 		// HOMERUUUN
 		setHomerun(!homerun);
-
 	} else if (key == 'n') {
 		setNextLevel();
+	} else if (key == 'f') {
+		sendForce = !sendForce;
+		std::cout << "sendforce: " << sendForce << std::endl;
 	}
 }
 
@@ -980,7 +984,12 @@ void updateHaptics(void) {
 		}
 
 		// send forces to haptic device
-		hapticDevice->setForce(force);
+		if (sendForce) {
+			hapticDevice->setForce(force);
+		} else {
+			cVector3d zero(0, 0, 0);
+			hapticDevice->setForce(zero);
+		}
 
 		// Check collision with targets
 		bool collision = true;
@@ -994,7 +1003,7 @@ void updateHaptics(void) {
 			delay = true;
 			timer = 0;
 
-			printf("%i;%f;%i\n", level, levelTimer, thrownBalls);
+			printf("%i\t%f\t%i\n", level, levelTimer, thrownBalls);
 		}
 		if (!collided) {
 			for (int i = 0; i < 3; i++) {
