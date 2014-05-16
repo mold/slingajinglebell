@@ -94,6 +94,8 @@ bool limitX = false;
 
 // show homerun
 bool homerun = false;
+string homerunTexts[] = { "Great!", "wow!", "HOMERUN", "You da best!!!",
+		"BULL'S EYE", "KA-CHING", "*splat*" };
 cLabel* titleLabel;
 
 const double CAMERA_X = 3.8;
@@ -313,6 +315,7 @@ private:
 	CircleMesh* target;
 	cShapeLine* line;
 	cWorld* world;
+
 public:
 	Target(cWorld*, cVector3d, double);
 	bool sphereCollide(cShapeSphere*);
@@ -320,6 +323,9 @@ public:
 	void remove();
 	bool hasCollided();
 	void rotate();
+    void updatePos();
+    cVector3d vel;
+    void setVel(cVector3d);
 	virtual ~Target();
 };
 
@@ -336,6 +342,7 @@ Target::Target(cWorld *world, cVector3d pos, double radius) {
 	floor.z = groundZ;
 	line = new cShapeLine(floor, pos);
 	world->addChild(line);
+    vel = cVector3d(0,0,0);
 }
 
 bool Target::sphereCollide(cShapeSphere *sphere) {
@@ -363,6 +370,19 @@ bool Target::hasCollided() {
 
 void Target::rotate() {
 	target->rotate(cVector3d(0, 1, 0), -M_PI / 2);
+}
+
+void Target::updatePos(){
+if(vel.x!=0||vel.y!=0||vel.z!=0){
+    vel.add(cMul(0.001,GRAVITY));
+    pos.add(vel);
+    target->setPos(pos);
+    target->rotate(cVector3d((double) random() / RAND_MAX,(double) random() / RAND_MAX,(double) random() / RAND_MAX),((double) random() / RAND_MAX)/50);
+}
+}
+
+void Target::setVel(cVector3d nVel){
+    vel = cVector3d(nVel.x, nVel.y, nVel.z);
 }
 
 Target::~Target() {
@@ -729,7 +749,7 @@ void setHomerun(bool home) {
 		titleLabel->setPos(0, 0, 0);
 		titleLabel->m_fontColor.set((double) random() / RAND_MAX,
 				(double) random() / RAND_MAX, (double) random() / RAND_MAX);
-		titleLabel->m_string = "HOMERUN!";
+		titleLabel->m_string = homerunTexts[level];
 		titleLabel->m_font = font;
 
 		world->addChild(titleLabel);
@@ -779,6 +799,8 @@ void updateGraphics(void) {
 				(double) random() / RAND_MAX, (double) random() / RAND_MAX);
 
 	}
+
+
 
 	// update shadow size and position
 	projectileShadowCircle->setPos(cVector3d(projectile->getPos().x,
@@ -928,7 +950,10 @@ void updateHaptics(void) {
 			if (projPos.z + projectileVel.z < groundZ) {
 				cVector3d dir = cNormalize(projectileVel);
 				double zDistToGround = (groundZ - projPos.z) / dir.z;
-				projectileVel = cMul(zDistToGround, projectileVel);
+				projectile->setPos(cAdd(projPos, cMul(zDistToGround, projectileVel)));
+                projectileVel.z = -projectileVel.z*0.8;
+projectileVel.x = projectileVel.x*0.9;
+projectileVel.y = projectileVel.y*0.9;
 			}
 		}
 
@@ -1008,11 +1033,19 @@ void updateHaptics(void) {
 		if (!collided) {
 			for (int i = 0; i < 3; i++) {
 				if (currentTargets[i]->sphereCollide(projectile)) {
-					projectileVel = cVector3d();
+                    currentTargets[i]->setVel(projectileVel);
+					projectileVel = cVector3d(-projectileVel.x*0.6	,projectileVel.y*0.6,projectileVel.z*0.6);
 					collided = true;
+
 				}
 			}
 		}
+
+    // move targets
+    for(int i = 0; i < TARGETS; i++){
+        currentTargets[i]->updatePos();
+    }
+
 
 		// check the delay
 		if (delay) {
